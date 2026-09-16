@@ -2,6 +2,7 @@ import type { ResortModel } from "@/lib/architecture/types";
 import { gaussian, mulberry32, pick, randInt, randRange, type Rand } from "@/lib/utils";
 import { reviewText as reviewTextSeed } from "./text";
 import { scoreText as scoreTextSeed } from "@/lib/intelligence/sentiment";
+import { assessAsset as assessAssetSeed } from "@/lib/intelligence/maintenance";
 import type {
   AssetState,
   Dept,
@@ -207,6 +208,20 @@ export function seedState(model: ResortModel, seed: number, scenario: Scenario):
       lastServiceAt: t - randInt(r, 10, 200) * DAY,
       history: [],
     };
+  }
+
+  for (const a of model.assets) {
+    const st = assets[a.id];
+    const res = assessAssetSeed(a.kind, st);
+    st.failureProb7d = res.prob7d;
+    st.rulDays = res.rulDays;
+    st.status = res.prob7d > 0.6 ? "critical" : res.prob7d > 0.3 ? "degraded" : "healthy";
+    for (let i = 12; i >= 1; i--) st.history.push({ t: t - i * 30, temp: st.temp + gaussian(r, 0, 0.5), vib: st.vibration + gaussian(r, 0, 0.06) });
+  }
+  for (const cell of model.rooms) {
+    let risk = 0;
+    for (const a of model.assets) if (a.servesFloors.includes(cell.floor)) risk = Math.max(risk, assets[a.id].failureProb7d * (a.kind === "ahu" ? 1 : a.kind === "chiller" ? 0.8 : 0.5));
+    rooms[cell.id].maintRisk = risk;
   }
 
   const inventory: Record<string, InventoryItem> = {};

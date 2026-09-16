@@ -59,7 +59,8 @@ export function OverviewPanel() {
               return (
                 <button key={f.index} onClick={() => useTwin.getState().setIsolatedFloor(f.index)} className="group flex items-center gap-2 rounded px-1 py-0.5 hover:bg-white/5">
                   <span className="mono w-4 text-[11px] text-low">{f.index}</span>
-                  <Meter value={occ} color={risk > 0.5 ? "var(--critical)" : "var(--accent)"} className="flex-1" />
+                  <Meter value={occ} color="var(--accent)" className="flex-1" />
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: risk > 0.6 ? "var(--critical)" : risk > 0.3 ? "var(--warm)" : "var(--stroke-lit)" }} title={`max asset risk ${(risk * 100).toFixed(0)}%`} />
                   <span className="mono w-10 text-right text-[10.5px] text-mid">{(occ * 100).toFixed(0)}%</span>
                   <span className={cn("mono w-8 text-right text-[10px]", dirty ? "text-warm" : "text-low")}>{dirty}d</span>
                 </button>

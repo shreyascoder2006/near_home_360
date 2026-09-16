@@ -10,7 +10,7 @@ import { CameraRig } from "./CameraRig";
 import { Resort } from "./Resort";
 import { StaffAgents } from "./StaffAgents";
 import { Markers } from "./Markers";
-import { DebugBridge } from "./DebugBridge";
+import { DebugBridge, ReadySignal } from "./DebugBridge";
 import { GuestFlow } from "./GuestFlow";
 import { Tour, IdleOrbit } from "./Tour";
 import { useProfile, useQuality } from "@/store/quality";
@@ -56,6 +56,7 @@ export function TwinCanvas() {
         <Markers />
         <Tour />
         <IdleOrbit />
+        <ReadySignal />
         <ContactShadows position={[0, 0.01, -20]} opacity={0.5} scale={280} blur={2.4} far={60} resolution={1024} color="#000000" />
         <Effects />
       </Suspense>

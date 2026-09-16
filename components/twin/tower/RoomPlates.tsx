@@ -9,29 +9,52 @@ import { roomColor } from "@/lib/twin/colors";
 import { useRegisterMaterial } from "../FloorGroup";
 import { useTwin } from "@/store/twin";
 import { useSim } from "@/store/sim";
+import { getModel } from "@/lib/architecture/model";
 
 const tmpColor = new THREE.Color();
+const white = new THREE.Color("#ffffff");
 const tmpM = new THREE.Matrix4();
+const tmpQ = new THREE.Quaternion();
+const tmpP = new THREE.Vector3();
+const tmpS = new THREE.Vector3();
 
 export function RoomPlates({ floor }: { floor: FloorSpec }) {
   const ref = useRef<THREE.InstancedMesh>(null!);
+  const glow = useRef<THREE.InstancedMesh>(null!);
   const mat = useMemo(() => makePlate(), []);
-  useRegisterMaterial(mat);
+  const glowMat = useMemo(() => {
+    const m = new THREE.MeshBasicMaterial({ color: "#ffffff", toneMapped: false, side: THREE.DoubleSide });
+    m.userData.role = "plate";
+    m.userData.baseOpacity = 1;
+    return m;
+  }, []);
+  useRegisterMaterial([mat, glowMat]);
   const rooms = floor.rooms;
   const geo = useMemo(() => new THREE.BoxGeometry(1, 0.06, 1), []);
+  const glowGeo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
+  const D = getModel().dims.depth / 2;
 
   useEffect(() => {
     const m = ref.current;
+    const g = glow.current;
     rooms.forEach((r, i) => {
       tmpM.makeScale(r.w - 0.32, 1, r.d - 0.32);
       tmpM.setPosition(r.center[0], 0.04, r.center[2]);
       m.setMatrixAt(i, tmpM);
       m.setColorAt(i, tmpColor.set("#22364a"));
+      tmpQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r.facing === 1 ? 0 : Math.PI);
+      tmpP.set(r.center[0], r.h * 0.5, r.facing * (D + 0.12));
+      tmpS.set(r.w - 0.7, r.h - 1.1, 1);
+      g.setMatrixAt(i, tmpM.compose(tmpP, tmpQ, tmpS));
+      g.setColorAt(i, tmpColor);
     });
     m.instanceMatrix.needsUpdate = true;
+    g.instanceMatrix.needsUpdate = true;
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    if (g.instanceColor) g.instanceColor.needsUpdate = true;
     m.computeBoundingSphere();
-  }, [rooms]);
+    g.computeBoundingSphere();
+  }, [rooms, D]);
 
   const lastVersion = useRef(-1);
   const lastLayer = useRef("");
@@ -41,7 +64,8 @@ export function RoomPlates({ floor }: { floor: FloorSpec }) {
 
   useFrame((_, dt) => {
     const m = ref.current;
-    if (!m) return;
+    const g = glow.current;
+    if (!m || !g) return;
     const { activeLayer, selected, hovered } = useTwin.getState();
     const { version, state } = useSim.getState();
     pulse.current += dt;
@@ -56,14 +80,14 @@ export function RoomPlates({ floor }: { floor: FloorSpec }) {
     rooms.forEach((r, i) => {
       const st = state.rooms[r.id];
       roomColor(activeLayer, r, st, tmpColor);
-      if (r.id === hovId) tmpColor.lerp(new THREE.Color("#ffffff"), 0.35);
-      if (r.id === selId) {
-        const p = 0.55 + 0.45 * Math.sin(pulse.current * 5);
-        tmpColor.lerp(new THREE.Color("#ffffff"), 0.25 + 0.35 * p);
-      }
+      if (r.id === hovId) tmpColor.lerp(white, 0.35);
+      if (r.id === selId) tmpColor.lerp(white, 0.25 + 0.35 * (0.55 + 0.45 * Math.sin(pulse.current * 5)));
       m.setColorAt(i, tmpColor);
+      const lit = activeLayer === "occupancy" ? (st.guestId ? 0.75 : st.status === "vacant-dirty" ? 0.6 : 0.3) : 0.7;
+      g.setColorAt(i, tmpColor.multiplyScalar(lit));
     });
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    if (g.instanceColor) g.instanceColor.needsUpdate = true;
   });
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
@@ -87,13 +111,9 @@ export function RoomPlates({ floor }: { floor: FloorSpec }) {
   };
 
   return (
-    <instancedMesh
-      ref={ref}
-      args={[geo, mat, rooms.length]}
-      onClick={onClick}
-      onPointerOver={onOver}
-      onPointerOut={onOut}
-      frustumCulled={false}
-    />
+    <>
+      <instancedMesh ref={ref} args={[geo, mat, rooms.length]} onClick={onClick} onPointerOver={onOver} onPointerOut={onOut} frustumCulled={false} />
+      <instancedMesh ref={glow} args={[glowGeo, glowMat, rooms.length]} onClick={onClick} onPointerOver={onOver} onPointerOut={onOut} frustumCulled={false} />
+    </>
   );
 }

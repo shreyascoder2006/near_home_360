@@ -21,26 +21,26 @@ export const makeGlass = (transmission: boolean) =>
   tag(
     transmission
       ? new THREE.MeshPhysicalMaterial({
-          color: "#9fd6e8",
-          roughness: 0.08,
+          color: "#bcd9e6",
+          roughness: 0.06,
           metalness: 0,
-          transmission: 0.85,
-          thickness: 0.4,
+          transmission: 0.9,
+          thickness: 0.3,
           ior: 1.45,
           transparent: true,
-          opacity: 0.55,
+          opacity: 0.4,
           side: THREE.DoubleSide,
-          envMapIntensity: 1.4,
+          envMapIntensity: 1.3,
         })
       : new THREE.MeshPhysicalMaterial({
-          color: "#7fc4dc",
-          roughness: 0.1,
-          metalness: 0.15,
+          color: "#a9c9d8",
+          roughness: 0.12,
+          metalness: 0.2,
           transparent: true,
-          opacity: 0.32,
+          opacity: 0.22,
           side: THREE.DoubleSide,
-          envMapIntensity: 1.6,
-          clearcoat: 0.6,
+          envMapIntensity: 1.4,
+          clearcoat: 0.5,
         }),
     "glass",
   );

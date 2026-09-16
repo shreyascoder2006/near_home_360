@@ -89,7 +89,7 @@ export function Markers() {
   return (
     <>
       {alerts.map(({ a, pos }) => (
-        <Html key={a.id} position={pos} center zIndexRange={[50, 0]} style={{ pointerEvents: "none" }}>
+        <Html key={a.id} position={pos} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -111,7 +111,7 @@ export function Markers() {
         </Html>
       ))}
       {focusPos && focusLabel && (
-        <Html position={[focusPos[0], focusPos[1] + 0.6, focusPos[2]]} center zIndexRange={[60, 0]} style={{ pointerEvents: "none" }}>
+        <Html position={[focusPos[0], focusPos[1] + 0.6, focusPos[2]]} center zIndexRange={[6, 0]} style={{ pointerEvents: "none" }}>
           <div className={cn("mono whitespace-nowrap rounded-md border border-accent/60 bg-void/80 px-2 py-1 text-[11px] text-hi backdrop-blur-md", selected ? "shadow-[0_0_16px_rgba(45,212,191,0.35)]" : "opacity-80")}>{focusLabel}</div>
         </Html>
       )}

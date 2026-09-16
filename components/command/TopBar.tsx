@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Pause, Play, RotateCcw, Gauge, Bell, ChevronDown } from "lucide-react";
+import { Pause, Play, RotateCcw, Gauge, Bell, ChevronDown, Search, HelpCircle } from "lucide-react";
 import { useSim } from "@/store/sim";
+import { useUi } from "@/store/ui";
 import { useQuality, type QualityTier } from "@/store/quality";
 import { fmtClock } from "@/lib/sim/engine";
 import type { Scenario } from "@/lib/sim/types";
-import { Button, Provenance } from "@/components/ui/primitives";
+import { Button, Kbd, Provenance } from "@/components/ui/primitives";
 import { cn, fmtINR, fmtPct } from "@/lib/utils";
 
 const scenarios: { id: Scenario; label: string }[] = [
@@ -101,6 +102,14 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-2">
+        <button onClick={() => useUi.getState().setPalette(true)} className="flex h-8 items-center gap-2 rounded-md border border-stroke px-2.5 text-[12px] text-mid hover:border-stroke-lit hover:text-hi">
+          <Search size={13} />
+          Search
+          <Kbd>⌘K</Kbd>
+        </button>
+        <button onClick={() => useUi.getState().setHelp(true)} className="grid h-8 w-8 place-items-center rounded-md text-low hover:bg-white/5 hover:text-hi" aria-label="Keyboard shortcuts">
+          <HelpCircle size={14} />
+        </button>
         <Gauge size={13} className="text-low" />
         <span className={cn("mono text-[11px]", fps < 40 ? "text-warm" : "text-low")}>{fps} fps</span>
         <select
