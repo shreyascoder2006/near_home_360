@@ -1,0 +1,110 @@
+import type { ResortModel } from "@/lib/architecture/types";
+import type { Recommendation, SimState } from "@/lib/sim/types";
+import { pushFeed, scheduleService, resolveAlert, nextId } from "./engine";
+import { rateForRoom } from "./seed";
+import { clamp } from "@/lib/utils";
+
+export function executeRecommendation(state: SimState, model: ResortModel, rec: Recommendation) {
+  if (rec.status !== "pending") return;
+  rec.status = "executed";
+  const p = rec.payload ?? {};
+  switch (rec.module) {
+    case "maintenance": {
+      scheduleService(state, model, p.assetId as string);
+      break;
+    }
+    case "pricing": {
+      const mult = p.multiplier as number;
+      const prev = state.rateMultiplier;
+      state.rateMultiplier = mult;
+      for (const r of model.rooms) {
+        const st = state.rooms[r.id];
+        if (!st.guestId) st.rate = rateForRoom(state.baseRate, r.type, r.seaView, r.floor, mult);
+      }
+      pushFeed(state, "pricing", `BAR multiplier ${prev.toFixed(2)}× → ${mult.toFixed(2)}× applied to all unsold inventory`, "resort", "pricing", "info");
+      break;
+    }
+    case "staffing": {
+      const dept = p.dept as string;
+      const count = p.count as number;
+      const shift = p.shift as "morning" | "evening" | "night";
+      const pool = Object.values(state.staff).filter((s) => s.dept === dept && s.status === "off" && s.shift !== shift).slice(0, count);
+      for (const s of pool) {
+        s.shift = shift;
+        s.status = "idle";
+        s.hoursToday = 0;
+      }
+      pushFeed(state, "task", `${pool.length} ${dept} called in for ${shift} shift`, "resort", dept, "info");
+      break;
+    }
+    case "inventory": {
+      const it = state.inventory[p.itemId as string];
+      if (it) {
+        it.onOrder = p.qty as number;
+        it.orderEta = state.t + it.leadDays * 24 * 60;
+        pushFeed(state, "inventory", `PO raised: ${it.onOrder} ${it.unit} ${it.name}, ETA ${it.leadDays}d`, "inventory", it.id, "info");
+      }
+      break;
+    }
+    case "personalization": {
+      const g = state.guests[p.guestId as string];
+      if (g) {
+        g.sentiment = clamp(g.sentiment + (p.uplift as number), -1, 1);
+        if (g.roomId) state.rooms[g.roomId].sentiment = g.sentiment;
+        resolveAlert(state, `sent-${g.id}`);
+        pushFeed(state, "task", `${rec.action} → ${g.name}`, "guest", g.id, "info");
+      }
+      break;
+    }
+    case "sentiment": {
+      const floor = p.floor as number | null;
+      if (floor !== null) {
+        for (const r of model.rooms) {
+          if (r.floor !== floor) continue;
+          const st = state.rooms[r.id];
+          if (st.guestId) {
+            const g = state.guests[st.guestId];
+            g.sentiment = clamp(g.sentiment + 0.08, -1, 1);
+            st.sentiment = g.sentiment;
+          }
+        }
+      }
+      pushFeed(state, "task", `Quality action opened for ${p.dept}${floor !== null ? ` · floor ${floor} inspection scheduled` : ""}`, "resort", p.dept as string, "info");
+      break;
+    }
+    case "segmentation": {
+      for (const id of p.members as string[]) {
+        const g = state.guests[id];
+        if (g) {
+          g.sentiment = clamp(g.sentiment + 0.12, -1, 1);
+          if (g.roomId) state.rooms[g.roomId].sentiment = g.sentiment;
+        }
+      }
+      pushFeed(state, "task", `Segment offer pushed to ${(p.members as string[]).length} guests`, "resort", "segment", "info");
+      break;
+    }
+    case "concierge":
+      break;
+  }
+}
+
+export function dismissRecommendation(state: SimState, rec: Recommendation) {
+  if (rec.status === "pending") {
+    rec.status = "dismissed";
+    rec.createdAt = state.t;
+  }
+}
+
+export function setRoomConditioning(state: SimState, roomId: string, on: boolean) {
+  state.rooms[roomId].conditioned = on;
+}
+
+export function triggerFailure(state: SimState, model: ResortModel, assetId: string) {
+  const st = state.assets[assetId];
+  st.health = 0.08;
+  st.temp = st.tempBase + 18;
+  st.vibration = st.vibBase * 3;
+  pushFeed(state, "system", `Injected fault into ${model.assetById.get(assetId)!.name} (demo)`, "asset", assetId, "warn");
+}
+
+export { nextId };

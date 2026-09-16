@@ -1,0 +1,28 @@
+import type { ResortModel } from "@/lib/architecture/types";
+import type { ModuleId, Recommendation, SimState } from "@/lib/sim/types";
+import { pricingRecommendations } from "./pricing";
+import { staffingRecommendations } from "./staffing";
+import { inventoryRecommendations } from "./inventory";
+import { segmentationRecommendations } from "./segmentation";
+import { personalizationRecommendations } from "./personalization";
+
+export const moduleMeta: Record<ModuleId, { label: string; short: string; color: string; description: string; method: string }> = {
+  maintenance: { label: "Predictive Maintenance", short: "MAINT", color: "#f4436c", description: "Survival models on asset telemetry surface failures before a guest notices one.", method: "Weibull hazard + telemetry anomaly z-scores" },
+  pricing: { label: "Dynamic Pricing", short: "PRICE", color: "#2dd4bf", description: "Demand, pacing, seasonality and elasticity resolve to a rate you can accept in one click.", method: "Constant-elasticity demand curve, RevPAR grid search" },
+  staffing: { label: "Intelligent Staffing", short: "STAFF", color: "#f5a524", description: "Forecast demand per department, then solve the roster against availability.", method: "Hourly demand profiles, greedy allocation + swap improvement" },
+  inventory: { label: "Inventory Optimization", short: "INV", color: "#c084fc", description: "Consumption forecasting with reorder points that respect lead time and stockout risk.", method: "Holt linear forecast, safety stock, EOQ" },
+  personalization: { label: "Guest Personalization", short: "NBA", color: "#34d399", description: "Preferences, history and stay-stage resolve to a next-best action per guest.", method: "Rule-scored next-best-action ranking" },
+  concierge: { label: "AI Concierge", short: "CHAT", color: "#60a5fa", description: "Requests are classified, dispatched and tracked as real work on the twin.", method: "Weighted keyword intent classifier with urgency detection" },
+  sentiment: { label: "Sentiment Analysis", short: "SENT", color: "#f472b6", description: "Aspect-level scoring across reviews routes the complaint to the department.", method: "Aspect lexicon with clause-level negation" },
+  segmentation: { label: "Guest Segmentation", short: "SEG", color: "#94a3b8", description: "Behavioral clustering that produces segments you can price and market against.", method: "k-means (k=5, k-means++ init) on 6 normalized features" },
+};
+
+export function runModules(state: SimState, model: ResortModel): Recommendation[] {
+  return [
+    ...pricingRecommendations(state, model),
+    ...staffingRecommendations(state, model),
+    ...inventoryRecommendations(state, model),
+    ...segmentationRecommendations(state, model),
+    ...personalizationRecommendations(state, model),
+  ];
+}
