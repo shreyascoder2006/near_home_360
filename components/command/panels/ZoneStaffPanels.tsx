@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useSim } from "@/store/sim";
 import { useTwin } from "@/store/twin";
 import { getModel } from "@/lib/architecture/model";
@@ -146,11 +147,11 @@ export function StaffPanel({ id }: { id: string }) {
 export function GuestPanel({ id }: { id: string }) {
   const { state } = useSim();
   const g = state.guests[id];
-  if (!g) return null;
-  if (g.roomId) {
-    useTwin.getState().select({ kind: "room", id: g.roomId });
-    return null;
-  }
+  const roomId = g?.roomId ?? null;
+  useEffect(() => {
+    if (roomId) useTwin.getState().select({ kind: "room", id: roomId });
+  }, [roomId]);
+  if (!g || roomId) return null;
   return (
     <div className="flex flex-col gap-2">
       <h2 className="font-display text-[22px] font-semibold leading-none">{g.name}</h2>
