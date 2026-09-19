@@ -98,7 +98,7 @@ export function handleGuestMessage(state: SimState, model: ResortModel, roomId: 
   const room = state.rooms[roomId];
   const guestId = room?.guestId ?? null;
   const cell = model.roomById.get(roomId);
-  state.chat.push({ id: `c-${state.chat.length + 1}`, role: "guest", text, t: state.t });
+  state.chat.push({ id: `c-${state.chat.length + 1}`, role: "guest", text, t: state.t, roomId });
   let requestId: string | undefined;
   if (c.requestType) {
     const req = createRequest(state, model, roomId, c.requestType, text, "concierge", c.urgency === "high" ? Math.round(c.sla * 0.6) : c.sla, guestId);
@@ -107,7 +107,7 @@ export function handleGuestMessage(state: SimState, model: ResortModel, roomId: 
     const staff = dispatchStaff(state, model, req, c.dept === "frontdesk" ? "frontdesk" : c.dept) ?? (tpl ? dispatchStaff(state, model, req, tpl.dept) : null);
     pushFeed(state, "concierge", `Concierge → ${c.requestType} task for ${cell?.number ?? roomId}${staff ? ` · ${staff.name} dispatched` : " · queued"}`, "room", roomId, c.urgency === "high" ? "warn" : "info");
   }
-  state.chat.push({ id: `c-${state.chat.length + 1}`, role: "concierge", text: c.reply, t: state.t, intent: c.intent, requestId });
+  state.chat.push({ id: `c-${state.chat.length + 1}`, role: "concierge", text: c.reply, t: state.t, intent: c.intent, requestId, roomId, confidence: c.confidence, urgency: c.urgency });
   if (state.chat.length > 80) state.chat.splice(0, state.chat.length - 80);
   return { classified: c, requestId };
 }

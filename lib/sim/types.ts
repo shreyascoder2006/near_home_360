@@ -199,6 +199,9 @@ export interface ChatMessage {
   t: number;
   intent?: string;
   requestId?: string;
+  roomId?: string;
+  confidence?: number;
+  urgency?: "normal" | "high";
 }
 
 export type Scenario = "peak-season" | "monsoon-lull" | "conference-block" | "equipment-crisis" | "vip-arrival";

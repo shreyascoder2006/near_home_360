@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Radar } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useSim } from "@/store/sim";
 import { useTwin } from "@/store/twin";
+import { useTrace } from "@/store/trace";
 import { getModel } from "@/lib/architecture/model";
 import { aspectSummary, scoreText } from "@/lib/intelligence/sentiment";
+import { worstAssetForRoom } from "@/lib/twin/trace";
 import { executeRecommendation } from "@/lib/sim/actions";
 import { fmtClock } from "@/lib/sim/engine";
 import { AnalyticsShell, Card, chartTheme } from "./AnalyticsShell";
@@ -108,16 +111,35 @@ export function SentimentPage() {
             <p className="text-[12px] text-low">No aspect currently meets the routing threshold (≥3 mentions, score &lt; −0.2).</p>
           ) : (
             <div className="grid grid-cols-2 gap-2">
-              {recs.map((r) => (
-                <div key={r.id} className="rounded-lg border border-critical/40 bg-critical/5 p-3">
-                  <div className="text-[12.5px] text-hi">{r.title}</div>
-                  <p className="mt-1 text-[11px] text-mid">{r.body}</p>
-                  <p className="mt-1 text-[10.5px] text-low">{r.action}</p>
-                  <Button size="sm" variant="primary" className="mt-2" onClick={() => mutate((s) => executeRecommendation(s, model, s.recommendations[r.id]))}>
-                    Open quality action
-                  </Button>
-                </div>
-              ))}
+              {recs.map((r) => {
+                const floor = r.payload?.floor as number | null | undefined;
+                const candidate = floor != null ? model.rooms.find((rm) => rm.floor === floor && state.rooms[rm.id].guestId && (state.rooms[rm.id].sentiment ?? 0) < -0.1) : null;
+                return (
+                  <div key={r.id} className="rounded-lg border border-critical/40 bg-critical/5 p-3">
+                    <div className="text-[12.5px] text-hi">{r.title}</div>
+                    <p className="mt-1 text-[11px] text-mid">{r.body}</p>
+                    <p className="mt-1 text-[10.5px] text-low">{r.action}</p>
+                    <div className="mt-2 flex gap-1.5">
+                      <Button size="sm" variant="primary" onClick={() => mutate((s) => executeRecommendation(s, model, s.recommendations[r.id]))}>
+                        Open quality action
+                      </Button>
+                      {candidate && (
+                        <Link
+                          href="/command"
+                          onClick={() => {
+                            const w = worstAssetForRoom(model, state, candidate.id);
+                            if (w) useTrace.getState().start(candidate.id, w.id);
+                          }}
+                        >
+                          <Button size="sm" variant="outline">
+                            <Radar size={12} /> Investigate
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </Card>

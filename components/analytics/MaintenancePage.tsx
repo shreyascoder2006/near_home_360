@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { Radar } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from "recharts";
 import { useSim } from "@/store/sim";
 import { useTwin } from "@/store/twin";
+import { useTrace } from "@/store/trace";
 import { getModel } from "@/lib/architecture/model";
 import { assessAsset } from "@/lib/intelligence/maintenance";
+import { sampleServedRoom } from "@/lib/twin/trace";
 import { scheduleService } from "@/lib/sim/engine";
 import { triggerFailure } from "@/lib/sim/actions";
 import { AnalyticsShell, Card, chartTheme } from "./AnalyticsShell";
@@ -46,7 +49,22 @@ export function MaintenancePage() {
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <Card title={`Cumulative failure probability · ${worst.a.name}`} right={<Provenance kind="modeled" />} className="col-span-2">
+        <Card
+          title={`Cumulative failure probability · ${worst.a.name}`}
+          right={
+            <div className="flex items-center gap-2">
+              {worst.st.failureProb7d > 0.25 && (
+                <Link href="/command" onClick={() => { const room = sampleServedRoom(model, state, worst.a.id); if (room) useTrace.getState().start(room, worst.a.id); }}>
+                  <Button size="sm" variant="outline" className="border-critical/50 text-critical hover:bg-critical/10">
+                    <Radar size={12} /> Investigate on twin
+                  </Button>
+                </Link>
+              )}
+              <Provenance kind="modeled" />
+            </div>
+          }
+          className="col-span-2"
+        >
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={survival}>
               <CartesianGrid stroke={chartTheme.grid} strokeDasharray="2 4" />
@@ -123,16 +141,25 @@ export function MaintenancePage() {
                   <td className={cn("py-2", res.vibZ > 2 ? "text-critical" : "text-mid")}>{res.vibZ.toFixed(1)}</td>
                   <td className="py-2 text-mid">{model.rooms.filter((r) => a.servesFloors.includes(r.floor)).length} rooms</td>
                   <td className="py-2 text-right">
-                    {st.status === "service" || st.status === "failed" ? null : (
-                      <div className="flex justify-end gap-1">
-                        <Button size="sm" variant="outline" onClick={() => mutate((s) => scheduleService(s, model, a.id))}>
-                          Service
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => mutate((s) => triggerFailure(s, model, a.id))} title="Demo: inject fault">
-                          Fault
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex justify-end gap-1">
+                      {st.failureProb7d > 0.25 && (
+                        <Link href="/command" onClick={() => { const room = sampleServedRoom(model, state, a.id); if (room) useTrace.getState().start(room, a.id); }}>
+                          <Button size="sm" variant="ghost" title="Investigate on the twin">
+                            <Radar size={12} />
+                          </Button>
+                        </Link>
+                      )}
+                      {st.status !== "service" && st.status !== "failed" && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => mutate((s) => scheduleService(s, model, a.id))}>
+                            Service
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => mutate((s) => triggerFailure(s, model, a.id))} title="Demo: inject fault">
+                            Fault
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

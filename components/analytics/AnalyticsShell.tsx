@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Box, Pause, Play } from "lucide-react";
@@ -16,6 +17,7 @@ export const routes = [
   { href: "/maintenance", label: "Maintenance" },
   { href: "/inventory", label: "Inventory" },
   { href: "/sentiment", label: "Sentiment" },
+  { href: "/concierge", label: "Concierge" },
 ];
 
 export function AnalyticsShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
@@ -23,6 +25,8 @@ export function AnalyticsShell({ title, subtitle, children }: { title: string; s
   const path = usePathname();
   const { state, setPaused, setSpeed } = useSim();
   useSim((s) => s.version);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   return (
     <div className="flex h-full flex-col overflow-hidden bg-void">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-stroke px-4">
@@ -59,7 +63,7 @@ export function AnalyticsShell({ title, subtitle, children }: { title: string; s
             <h1 className="font-display text-[28px] font-semibold tracking-tight">{title}</h1>
             <p className="mt-1 text-[13px] text-mid">{subtitle}</p>
           </div>
-          {children}
+          {mounted ? children : <div className="h-[60vh] animate-pulse rounded-xl border border-stroke bg-deep/40" />}
         </div>
       </main>
     </div>
