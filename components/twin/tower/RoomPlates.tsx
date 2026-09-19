@@ -5,7 +5,7 @@ import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import type { FloorSpec } from "@/lib/architecture/types";
 import { makePlate } from "@/lib/twin/materials";
-import { roomColor } from "@/lib/twin/colors";
+import { roomColor, roomLayerValue } from "@/lib/twin/colors";
 import { useRegisterMaterial } from "../FloorGroup";
 import { useTwin } from "@/store/twin";
 import { useSim } from "@/store/sim";
@@ -18,6 +18,8 @@ const tmpM = new THREE.Matrix4();
 const tmpQ = new THREE.Quaternion();
 const tmpP = new THREE.Vector3();
 const tmpS = new THREE.Vector3();
+const FLAT_H = 0.06;
+const MAX_EXTRUDE = 2.3;
 
 export function RoomPlates({ floor }: { floor: FloorSpec }) {
   const ref = useRef<THREE.InstancedMesh>(null!);
@@ -31,16 +33,18 @@ export function RoomPlates({ floor }: { floor: FloorSpec }) {
   }, []);
   useRegisterMaterial([mat, glowMat]);
   const rooms = floor.rooms;
-  const geo = useMemo(() => new THREE.BoxGeometry(1, 0.06, 1), []);
+  const geo = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
   const glowGeo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
   const D = getModel().dims.depth / 2;
+  const heights = useRef<Float32Array>(new Float32Array(rooms.length).fill(FLAT_H));
 
   useEffect(() => {
+    heights.current = new Float32Array(rooms.length).fill(FLAT_H);
     const m = ref.current;
     const g = glow.current;
     rooms.forEach((r, i) => {
-      tmpM.makeScale(r.w - 0.32, 1, r.d - 0.32);
-      tmpM.setPosition(r.center[0], 0.04, r.center[2]);
+      tmpM.makeScale(r.w - 0.32, FLAT_H, r.d - 0.32);
+      tmpM.setPosition(r.center[0], FLAT_H / 2 + 0.01, r.center[2]);
       m.setMatrixAt(i, tmpM);
       m.setColorAt(i, tmpColor.set("#22364a"));
       tmpQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r.facing === 1 ? 0 : Math.PI);
@@ -72,6 +76,28 @@ export function RoomPlates({ floor }: { floor: FloorSpec }) {
     pulse.current += dt;
     const selId = selected?.kind === "room" ? selected.id : null;
     const hovId = hovered?.kind === "room" ? hovered.id : null;
+
+    // Height animates continuously toward a target every frame (independent of the
+    // colour-recompute gate below) so the extrusion rises/falls smoothly when the
+    // Revenue layer is toggled, rather than snapping.
+    const k = 1 - Math.exp(-6 * dt);
+    let anyExtruded = false;
+    rooms.forEach((r, i) => {
+      const st = state.rooms[r.id];
+      const target = activeLayer === "revenue" ? FLAT_H + roomLayerValue("revenue", r, st) * MAX_EXTRUDE : FLAT_H;
+      const cur = heights.current[i];
+      const next = cur + (target - cur) * k;
+      heights.current[i] = next;
+      if (Math.abs(next - FLAT_H) > 0.01) anyExtruded = true;
+      if (Math.abs(next - cur) > 0.0005 || Math.abs(next - FLAT_H) > 0.01) {
+        tmpM.makeScale(r.w - 0.32, next, r.d - 0.32);
+        tmpM.setPosition(r.center[0], next / 2 + 0.01, r.center[2]);
+        m.setMatrixAt(i, tmpM);
+      }
+    });
+    m.instanceMatrix.needsUpdate = true;
+    if (anyExtruded) m.computeBoundingSphere();
+
     const needs = version !== lastVersion.current || activeLayer !== lastLayer.current || selId !== lastSel.current || hovId !== lastHov.current || selId !== null;
     if (!needs) return;
     lastVersion.current = version;

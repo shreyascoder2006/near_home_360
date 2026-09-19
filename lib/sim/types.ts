@@ -124,7 +124,8 @@ export type ModuleId =
   | "personalization"
   | "concierge"
   | "sentiment"
-  | "segmentation";
+  | "segmentation"
+  | "relocation";
 
 export interface Recommendation {
   id: string;

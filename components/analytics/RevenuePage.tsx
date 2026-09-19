@@ -3,17 +3,18 @@
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Bar, BarChart } from "recharts";
 import { useSim } from "@/store/sim";
 import { getModel } from "@/lib/architecture/model";
-import { computePricing } from "@/lib/intelligence/pricing";
+import { computePricing, computeSegmentPricing } from "@/lib/intelligence/pricing";
 import { executeRecommendation } from "@/lib/sim/actions";
 import { AnalyticsShell, Card, chartTheme } from "./AnalyticsShell";
 import { Button, Provenance, Stat, Tag } from "@/components/ui/primitives";
-import { fmtINR, fmtPct } from "@/lib/utils";
+import { cn, fmtINR, fmtPct } from "@/lib/utils";
 import { fmtClock } from "@/lib/sim/engine";
 
 export function RevenuePage() {
   const { state, mutate } = useSim();
   const model = getModel();
   const p = computePricing(state, model);
+  const segRates = computeSegmentPricing(state, model);
   const rec = state.recommendations["rec-price-bar"];
   const hist = state.kpiHistory.slice(-96).map((h) => ({ t: fmtClock(h.t).slice(3), occ: +(h.occupancy * 100).toFixed(1), adr: Math.round(h.adr), revpar: Math.round(h.revpar) }));
   const byType = ["standard", "deluxe", "suite", "accessible"].map((type) => {
@@ -61,7 +62,12 @@ export function RevenuePage() {
               <div className="flex justify-between"><span>seasonality</span><span className="text-hi">{p.inputs.seasonality.toFixed(2)}</span></div>
               <div className="flex justify-between"><span>pacing (48h)</span><span className="text-hi">{p.inputs.pacing >= 0 ? "+" : ""}{(p.inputs.pacing * 100).toFixed(1)} pts</span></div>
               <div className="flex justify-between"><span>competitor index</span><span className="text-hi">{p.inputs.competitorIndex.toFixed(2)}</span></div>
-              <div className="flex justify-between"><span>elasticity</span><span className="text-hi">{p.inputs.elasticity.toFixed(2)}</span></div>
+              <div className="flex justify-between">
+                <span>elasticity</span>
+                <span className="text-hi">
+                  {p.inputs.elasticity.toFixed(2)} <span className="text-low">({p.inputs.elasticitySource === "segment-blend" ? "segment blend" : "default"})</span>
+                </span>
+              </div>
               <div className="flex justify-between"><span>event uplift</span><span className="text-hi">+{(p.inputs.eventUplift * 100).toFixed(0)}%</span></div>
             </div>
             {rec?.status === "pending" ? (
@@ -74,6 +80,53 @@ export function RevenuePage() {
           </div>
         </Card>
       </div>
+
+      {segRates.length > 0 && (
+        <Card title="Pricing by segment" right={<Provenance kind="modeled" />}>
+          <p className="mb-3 text-[11.5px] text-mid">
+            What each guest segment's own price sensitivity would support, holding today&rsquo;s seasonality and competitor index fixed. The blended elasticity above (
+            {p.inputs.elasticity.toFixed(2)}) is these segments weighted by in-house guest count — segmentation output drives the resort-wide rate, not just this table.
+          </p>
+          <table className="w-full text-[12px]">
+            <thead className="label text-left">
+              <tr>
+                <th className="pb-2 font-normal">Segment</th>
+                <th className="pb-2 font-normal">In-house</th>
+                <th className="pb-2 font-normal">Elasticity</th>
+                <th className="pb-2 font-normal">Would support</th>
+                <th className="pb-2 font-normal">vs. current BAR</th>
+                <th className="pb-2 font-normal">RevPAR delta</th>
+              </tr>
+            </thead>
+            <tbody className="mono">
+              {segRates.map((s) => {
+                const deltaPct = (s.recommendedAdr - s.currentAdr) / s.currentAdr;
+                return (
+                  <tr key={s.cluster.id} className="border-t border-stroke/60">
+                    <td className="py-2">
+                      <span className="flex items-center gap-2 text-hi">
+                        <span className="h-2 w-2 rounded-sm" style={{ background: s.cluster.color }} />
+                        {s.cluster.name}
+                      </span>
+                    </td>
+                    <td className="py-2 text-mid">{s.cluster.size}</td>
+                    <td className="py-2 text-mid">{s.elasticity.toFixed(2)}</td>
+                    <td className="py-2 text-hi">{fmtINR(s.recommendedAdr)}</td>
+                    <td className={cn("py-2", deltaPct >= 0 ? "text-positive" : "text-critical")}>
+                      {deltaPct >= 0 ? "+" : ""}
+                      {(deltaPct * 100).toFixed(1)}%
+                    </td>
+                    <td className={cn("py-2", s.revparDelta >= 0 ? "text-positive" : "text-critical")}>
+                      {s.revparDelta >= 0 ? "+" : ""}
+                      {fmtINR(s.revparDelta)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         <Card title="Occupancy · ADR · RevPAR (hourly)" className="col-span-2" right={<Provenance />}>

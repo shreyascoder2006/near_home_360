@@ -1,8 +1,37 @@
 import type { ResortModel } from "@/lib/architecture/types";
 import type { Recommendation, SimState } from "@/lib/sim/types";
-import { pushFeed, scheduleService, resolveAlert, nextId } from "./engine";
+import type { RelocationPair } from "@/lib/intelligence/guestImpact";
+import { pushFeed, scheduleService, resolveAlert, nextId, createRequest, dispatchStaff } from "./engine";
 import { rateForRoom } from "./seed";
 import { clamp } from "@/lib/utils";
+
+/** Moves a guest out of a room whose climate asset has failed into a vacant-clean
+ * room outside that asset's zone. The vacated room goes `ooo` (unsellable) rather
+ * than `vacant-dirty` — it isn't habitable until the asset is serviced, which is a
+ * separate accepted maintenance recommendation. Rate never increases on an
+ * involuntary move even when the new room outranks the old one. */
+export function relocateGuest(state: SimState, model: ResortModel, pair: RelocationPair) {
+  const fromRoom = state.rooms[pair.fromRoomId];
+  const toRoom = state.rooms[pair.toRoomId];
+  const guest = state.guests[pair.guestId];
+  if (!fromRoom || !toRoom || !guest || fromRoom.guestId !== guest.id || toRoom.guestId) return;
+
+  toRoom.guestId = guest.id;
+  toRoom.status = guest.vip ? "vip" : "occupied";
+  toRoom.rate = Math.min(fromRoom.rate, toRoom.rate);
+  toRoom.sentiment = guest.sentiment;
+  toRoom.conditioned = true;
+  guest.roomId = pair.toRoomId;
+  guest.sentiment = clamp(guest.sentiment - 0.04, -1, 1);
+
+  fromRoom.guestId = null;
+  fromRoom.status = "ooo";
+  fromRoom.sentiment = null;
+
+  pushFeed(state, "task", `${guest.name} relocated ${pair.fromRoomNumber} → ${pair.toRoomNumber}${pair.upgrade ? " (complimentary upgrade)" : ""} — climate outage`, "room", pair.toRoomId, "warn");
+  const req = createRequest(state, model, pair.toRoomId, "concierge", `Escort ${guest.name} from ${pair.fromRoomNumber} to ${pair.toRoomNumber}`, "system", 20, guest.id);
+  dispatchStaff(state, model, req, "frontdesk") ?? dispatchStaff(state, model, req, "concierge");
+}
 
 export function executeRecommendation(state: SimState, model: ResortModel, rec: Recommendation) {
   if (rec.status !== "pending") return;
@@ -81,6 +110,11 @@ export function executeRecommendation(state: SimState, model: ResortModel, rec: 
         }
       }
       pushFeed(state, "task", `Segment offer pushed to ${(p.members as string[]).length} guests`, "resort", "segment", "info");
+      break;
+    }
+    case "relocation": {
+      const pairs = p.pairs as RelocationPair[];
+      for (const pair of pairs) relocateGuest(state, model, pair);
       break;
     }
     case "concierge":

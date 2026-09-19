@@ -5,6 +5,7 @@ import { staffingRecommendations } from "./staffing";
 import { inventoryRecommendations } from "./inventory";
 import { segmentationRecommendations } from "./segmentation";
 import { personalizationRecommendations } from "./personalization";
+import { guestImpactRecommendations } from "./guestImpact";
 
 export const moduleMeta: Record<ModuleId, { label: string; short: string; color: string; description: string; method: string }> = {
   maintenance: { label: "Predictive Maintenance", short: "MAINT", color: "#f4436c", description: "Survival models on asset telemetry surface failures before a guest notices one.", method: "Weibull hazard + telemetry anomaly z-scores" },
@@ -15,6 +16,7 @@ export const moduleMeta: Record<ModuleId, { label: string; short: string; color:
   concierge: { label: "AI Concierge", short: "CHAT", color: "#60a5fa", description: "Requests are classified, dispatched and tracked as real work on the twin.", method: "Weighted keyword intent classifier with urgency detection" },
   sentiment: { label: "Sentiment Analysis", short: "SENT", color: "#f472b6", description: "Aspect-level scoring across reviews routes the complaint to the department.", method: "Aspect lexicon with clause-level negation" },
   segmentation: { label: "Guest Segmentation", short: "SEG", color: "#94a3b8", description: "Behavioral clustering that produces segments you can price and market against.", method: "k-means (k=5, k-means++ init) on 6 normalized features" },
+  relocation: { label: "Guest Impact & Relocation", short: "RELOC", color: "#f5a524", description: "When climate control fails, matches displaced guests to vacant rooms outside the affected zone and escorts them.", method: "Greedy same-or-better-type matching against vacant-clean inventory" },
 };
 
 export function runModules(state: SimState, model: ResortModel): Recommendation[] {
@@ -24,5 +26,6 @@ export function runModules(state: SimState, model: ResortModel): Recommendation[
     ...inventoryRecommendations(state, model),
     ...segmentationRecommendations(state, model),
     ...personalizationRecommendations(state, model),
+    ...guestImpactRecommendations(state, model),
   ];
 }

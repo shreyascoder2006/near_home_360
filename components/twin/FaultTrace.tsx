@@ -8,7 +8,7 @@ import { useTrace, DRAW_DURATION, HOLD_DURATION } from "@/store/trace";
 import { useTwin } from "@/store/twin";
 import { useSim } from "@/store/sim";
 import { getModel } from "@/lib/architecture/model";
-import { roomAnchor, assetAnchor, sampleServedRoom } from "@/lib/twin/trace";
+import { roomAnchor, assetAnchor, sampleServedRoom, worstAssetForRoom } from "@/lib/twin/trace";
 import { clamp } from "@/lib/utils";
 
 const SEGMENTS = 48;
@@ -67,6 +67,7 @@ export function FaultTrace() {
   }, [active, roomId, assetId]);
 
   const seenAlerts = useRef<Set<string>>(new Set());
+  const seenChat = useRef<Set<string>>(new Set());
   const lastAutoAt = useRef(0);
   const pollAcc = useRef(0);
 
@@ -119,9 +120,10 @@ export function FaultTrace() {
     if (pollAcc.current > AUTO_POLL_S) {
       pollAcc.current = 0;
       const now = performance.now();
+      const st = useSim.getState().state;
+      const model = getModel();
+
       if (!useTrace.getState().active && now - lastAutoAt.current > AUTO_COOLDOWN_MS) {
-        const st = useSim.getState().state;
-        const model = getModel();
         for (const al of Object.values(st.alerts)) {
           if (seenAlerts.current.has(al.id)) continue;
           seenAlerts.current.add(al.id);
@@ -130,6 +132,25 @@ export function FaultTrace() {
           const room = sampleServedRoom(model, st, al.targetId);
           if (room) {
             useTrace.getState().start(room, al.targetId, true);
+            lastAutoAt.current = now;
+          }
+          break;
+        }
+      }
+
+      // A guest complaint tied to a room whose floor already has elevated maintenance
+      // risk is worth auto-investigating — a "waited too long at the restaurant" complaint
+      // isn't, so this only fires when the physical correlation is plausible.
+      if (!useTrace.getState().active && now - lastAutoAt.current > AUTO_COOLDOWN_MS) {
+        for (const m of st.chat.slice(-15)) {
+          if (seenChat.current.has(m.id)) continue;
+          seenChat.current.add(m.id);
+          if (m.role !== "concierge" || m.intent !== "complaint" || !m.roomId) continue;
+          const roomState = st.rooms[m.roomId];
+          if (!roomState || roomState.maintRisk < 0.3) continue;
+          const worst = worstAssetForRoom(model, st, m.roomId);
+          if (worst) {
+            useTrace.getState().start(m.roomId, worst.id, true);
             lastAutoAt.current = now;
           }
           break;

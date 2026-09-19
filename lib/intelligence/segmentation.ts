@@ -15,7 +15,24 @@ export interface Cluster {
   avgSentiment: number;
   offer: string;
   color: string;
+  elasticity: number;
 }
+
+/**
+ * Price elasticity of demand by segment name, on the same scale as the resort-wide
+ * constant-elasticity model in lib/intelligence/pricing.ts (more negative = more
+ * price-sensitive). Loyal/high-spend and short-lead corporate demand is comparatively
+ * inelastic (need drives the booking); leisure booked well in advance and pure
+ * value-seekers shop harder on rate.
+ */
+export const segmentElasticity: Record<string, number> = {
+  "High-Value Loyal": -0.55,
+  "Short-Lead Business": -0.7,
+  "Wellness Seekers": -1.05,
+  Families: -1.15,
+  "Planned Leisure": -1.35,
+  "Value Seekers": -1.9,
+};
 
 const featureNames = ["spend/night", "nights", "lead days", "party size", "spa share", "loyalty"];
 
@@ -91,6 +108,7 @@ export function segmentGuests(state: SimState, model: ResortModel): Cluster[] {
   const raw = guests.map(guestVector);
   const { norm } = normalize(raw);
   const { assign, centroids } = kmeans(norm, 5, state.seed);
+  const nameCounts = new Map<string, number>();
   return centroids.map((c, i) => {
     const members = guests.filter((_, j) => assign[j] === i);
     const rawMembers = raw.filter((_, j) => assign[j] === i);
@@ -119,6 +137,10 @@ export function segmentGuests(state: SimState, model: ResortModel): Cluster[] {
       name = "Planned Leisure";
       offer = "Early-bird 10% for 45+ day lead with sea-view upsell at booking; locks in shoulder demand.";
     }
+    const baseName = name;
+    const seen = nameCounts.get(name) ?? 0;
+    nameCounts.set(name, seen + 1);
+    if (seen > 0) name = `${name} (${seen + 1})`;
     return {
       id: i,
       name,
@@ -131,6 +153,7 @@ export function segmentGuests(state: SimState, model: ResortModel): Cluster[] {
       avgSentiment: members.length ? members.reduce((s, g) => s + g.sentiment, 0) / members.length : 0,
       offer,
       color: palette[i],
+      elasticity: segmentElasticity[baseName] ?? -1.2,
     };
   });
 }

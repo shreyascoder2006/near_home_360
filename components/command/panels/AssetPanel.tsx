@@ -1,13 +1,14 @@
 "use client";
 
-import { Wrench, Zap, Activity, Radar } from "lucide-react";
+import { Wrench, Zap, Activity, Radar, Users } from "lucide-react";
 import { useSim } from "@/store/sim";
 import { useTrace } from "@/store/trace";
 import { getModel } from "@/lib/architecture/model";
 import { assessAsset } from "@/lib/intelligence/maintenance";
+import { assessGuestImpact } from "@/lib/intelligence/guestImpact";
 import { sampleServedRoom } from "@/lib/twin/trace";
 import { scheduleService, pushFeed, fmtClock } from "@/lib/sim/engine";
-import { triggerFailure } from "@/lib/sim/actions";
+import { triggerFailure, relocateGuest } from "@/lib/sim/actions";
 import { Button, Meter, Provenance, Section, Sparkline, Stat, Tag } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,7 @@ export function AssetPanel({ id }: { id: string }) {
   const wo = Object.values(state.requests).find((r) => r.roomId === id && r.status !== "done");
   const temps = st.history.map((h) => h.temp);
   const vibs = st.history.map((h) => h.vib);
+  const impact = st.status === "failed" ? assessGuestImpact(state, model, id) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -138,18 +140,53 @@ export function AssetPanel({ id }: { id: string }) {
         )}
       </Section>
 
-      <Section title="Impact if failed">
-        <p className="text-[12px] leading-relaxed text-mid">
-          {a.kind === "chiller" || a.kind === "ahu"
-            ? `Loss of conditioning for ${rooms.length} rooms. Modeled sentiment decay −0.07/h for ${occ} in-house guests, est. ${Math.round(occ * 0.35)} room-nights compensated.`
-            : a.kind === "elevator"
-              ? `Vertical transport reduced to ${model.assets.filter((x) => x.kind === "elevator").length - 1} cars. Sentiment decay −0.03/h across ${occ} guests.`
-              : `Service interruption in ${a.floor === 0 ? "ground floor operations" : "roof amenities"}.`}
-        </p>
-        <Button size="sm" variant="ghost" className="self-start" onClick={() => mutate((s) => pushFeed(s, "system", `Impact note logged for ${a.name}`, "asset", id))}>
-          Log note
-        </Button>
-      </Section>
+      {impact && impact.pairs.length > 0 ? (
+        <Section title="Guest impact & relocation" right={<Tag color="#f5a524">RELOC</Tag>}>
+          <p className="text-[12px] leading-relaxed text-mid">
+            {impact.assetName} is down. {impact.affectedGuestCount} guests are in unconditioned rooms; {impact.pairs.length} have a same-or-better vacant room outside its zone
+            {impact.unplaced ? `, ${impact.unplaced} have no match yet` : ""}.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {impact.pairs.map((p) => (
+              <div key={p.guestId} className="flex items-center justify-between rounded-lg border border-stroke bg-white/[0.02] px-3 py-2 text-[12px]">
+                <span className="text-hi">
+                  {p.guestName} · {p.fromRoomNumber} → {p.toRoomNumber}
+                  {p.upgrade && (
+                    <Tag color="#34d399" className="ml-1.5">
+                      upgrade
+                    </Tag>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+          <Button
+            size="sm"
+            variant="primary"
+            className="self-start"
+            onClick={() =>
+              mutate((s) => {
+                for (const pair of impact.pairs) relocateGuest(s, model, pair);
+              })
+            }
+          >
+            <Users size={12} /> Relocate all {impact.pairs.length}
+          </Button>
+        </Section>
+      ) : (
+        <Section title="Impact if failed">
+          <p className="text-[12px] leading-relaxed text-mid">
+            {a.kind === "chiller" || a.kind === "ahu"
+              ? `Loss of conditioning for ${rooms.length} rooms. Modeled sentiment decay −0.07/h for ${occ} in-house guests, est. ${Math.round(occ * 0.35)} room-nights compensated.`
+              : a.kind === "elevator"
+                ? `Vertical transport reduced to ${model.assets.filter((x) => x.kind === "elevator").length - 1} cars. Sentiment decay −0.03/h across ${occ} guests.`
+                : `Service interruption in ${a.floor === 0 ? "ground floor operations" : "roof amenities"}.`}
+          </p>
+          <Button size="sm" variant="ghost" className="self-start" onClick={() => mutate((s) => pushFeed(s, "system", `Impact note logged for ${a.name}`, "asset", id))}>
+            Log note
+          </Button>
+        </Section>
+      )}
     </div>
   );
 }
