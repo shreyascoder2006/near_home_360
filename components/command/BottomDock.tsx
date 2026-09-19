@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, ChevronDown, ChevronUp, Sparkles, Activity, Bell } from "lucide-react";
+import { Check, X, ChevronDown, ChevronUp, Sparkles, Activity, Bell, Radar } from "lucide-react";
 import { useSim } from "@/store/sim";
 import { useTwin, type Selection } from "@/store/twin";
+import { useTrace } from "@/store/trace";
 import { getModel } from "@/lib/architecture/model";
 import { moduleMeta } from "@/lib/intelligence/registry";
+import { sampleServedRoom } from "@/lib/twin/trace";
 import { executeRecommendation, dismissRecommendation } from "@/lib/sim/actions";
 import { fmtClock, resolveAlert } from "@/lib/sim/engine";
 import type { Recommendation } from "@/lib/sim/types";
@@ -66,6 +68,19 @@ function RecCard({ rec }: { rec: Recommendation }) {
             <Button size="sm" variant="ghost" onClick={() => mutate((s) => dismissRecommendation(s, s.recommendations[rec.id]))}>
               <X size={12} /> Dismiss
             </Button>
+            {rec.module === "maintenance" && rec.targetKind === "asset" && (
+              <Button
+                size="icon"
+                variant="ghost"
+                title="Trace to affected room"
+                onClick={() => {
+                  const room = sampleServedRoom(model, useSim.getState().state, rec.targetId);
+                  if (room) useTrace.getState().start(room, rec.targetId);
+                }}
+              >
+                <Radar size={13} />
+              </Button>
+            )}
           </>
         ) : (
           <Tag color={rec.status === "executed" ? "#34d399" : undefined}>{rec.status}</Tag>

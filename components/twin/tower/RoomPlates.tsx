@@ -10,6 +10,7 @@ import { useRegisterMaterial } from "../FloorGroup";
 import { useTwin } from "@/store/twin";
 import { useSim } from "@/store/sim";
 import { getModel } from "@/lib/architecture/model";
+import { skyRuntime } from "@/lib/twin/sky";
 
 const tmpColor = new THREE.Color();
 const white = new THREE.Color("#ffffff");
@@ -84,7 +85,8 @@ export function RoomPlates({ floor }: { floor: FloorSpec }) {
       if (r.id === selId) tmpColor.lerp(white, 0.25 + 0.35 * (0.55 + 0.45 * Math.sin(pulse.current * 5)));
       m.setColorAt(i, tmpColor);
       const lit = activeLayer === "occupancy" ? (st.guestId ? 0.75 : st.status === "vacant-dirty" ? 0.6 : 0.3) : 0.7;
-      g.setColorAt(i, tmpColor.multiplyScalar(lit));
+      const nf = 0.22 + 0.85 * skyRuntime.nightFactor;
+      g.setColorAt(i, tmpColor.multiplyScalar(lit * nf));
     });
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
     if (g.instanceColor) g.instanceColor.needsUpdate = true;

@@ -37,3 +37,5 @@ export const useSim = create<SimStore>()(
 );
 
 export const simState = () => useSim.getState().state;
+
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") (window as unknown as { __sim: typeof useSim }).__sim = useSim;

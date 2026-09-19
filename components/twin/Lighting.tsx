@@ -1,15 +1,56 @@
 "use client";
 
+import { useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import * as THREE from "three";
 import { Environment, Lightformer } from "@react-three/drei";
 import { useProfile } from "@/store/quality";
+import { useSim } from "@/store/sim";
+import { DAY, HOUR } from "@/lib/sim/seed";
+import { computeSky, skyRuntime } from "@/lib/twin/sky";
+
+const SUN_R = 220;
 
 export function Lighting() {
   const p = useProfile();
+  const sun = useRef<THREE.DirectionalLight>(null!);
+  const rim = useRef<THREE.DirectionalLight>(null!);
+  const hemi = useRef<THREE.HemisphereLight>(null!);
+  const { scene } = useThree();
+  const fog = useRef(new THREE.Fog("#05070a", 160, 420));
+  const skyOut = useRef({ bg: new THREE.Color(), fog: new THREE.Color(), sunColor: new THREE.Color(), ambientColor: new THREE.Color() });
+
+  useFrame(() => {
+    const t = useSim.getState().state.t;
+    const hour = (t % DAY) / HOUR;
+    const sky = computeSky(hour, skyOut.current);
+    skyRuntime.hour = hour;
+    skyRuntime.nightFactor = sky.nightFactor;
+
+    if (!(scene.background instanceof THREE.Color)) scene.background = new THREE.Color();
+    (scene.background as THREE.Color).copy(sky.bg);
+    fog.current.color.copy(sky.fog);
+    scene.fog = fog.current;
+
+    if (sun.current) {
+      const az = sky.sunAzimuth;
+      const el = sky.sunElevation;
+      sun.current.position.set(Math.cos(az) * SUN_R, Math.max(6, el) * SUN_R * 0.55 + 25, Math.sin(az) * SUN_R);
+      sun.current.color.copy(sky.sunColor);
+      sun.current.intensity = sky.sunIntensity;
+    }
+    if (rim.current) rim.current.intensity = 0.15 + sky.nightFactor * 0.25;
+    if (hemi.current) {
+      hemi.current.color.copy(sky.ambientColor);
+      hemi.current.intensity = sky.ambientIntensity;
+    }
+  });
+
   return (
     <>
-      <hemisphereLight args={["#2a4a6a", "#0a0f14", 0.55]} />
+      <hemisphereLight ref={hemi} args={["#2a4a6a", "#0a0f14", 0.55]} />
       <directionalLight
-        position={[-60, 90, -40]}
+        ref={sun}
         intensity={1.6}
         color="#dfe9ff"
         castShadow={p.shadows}
@@ -19,11 +60,11 @@ export function Lighting() {
         shadow-camera-top={120}
         shadow-camera-bottom={-120}
         shadow-camera-near={10}
-        shadow-camera-far={300}
+        shadow-camera-far={340}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
       />
-      <directionalLight position={[70, 40, 60]} intensity={0.35} color="#2dd4bf" />
+      <directionalLight ref={rim} position={[70, 40, 60]} intensity={0.35} color="#2dd4bf" />
       <pointLight position={[0, 8, -55]} intensity={40} color="#0fb7d6" distance={60} decay={2} />
       <Environment resolution={256} frames={1} environmentIntensity={0.9}>
         <color attach="background" args={["#070b12"]} />
@@ -33,7 +74,6 @@ export function Lighting() {
         <Lightformer form="ring" intensity={1.5} color="#8fb8ff" position={[0, 80, 0]} scale={[40, 40, 1]} rotation-x={Math.PI / 2} />
         <Lightformer form="rect" intensity={0.5} color="#04365a" position={[0, -20, 0]} scale={[200, 200, 1]} rotation-x={-Math.PI / 2} />
       </Environment>
-      <fog attach="fog" args={["#05070a", 160, 420]} />
     </>
   );
 }

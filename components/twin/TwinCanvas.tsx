@@ -10,6 +10,7 @@ import { CameraRig } from "./CameraRig";
 import { Resort } from "./Resort";
 import { StaffAgents } from "./StaffAgents";
 import { Markers } from "./Markers";
+import { FaultTrace } from "./FaultTrace";
 import { DebugBridge, ReadySignal } from "./DebugBridge";
 import { GuestFlow } from "./GuestFlow";
 import { Tour, IdleOrbit } from "./Tour";
@@ -54,6 +55,7 @@ export function TwinCanvas() {
         <StaffAgents />
         <GuestFlow />
         <Markers />
+        <FaultTrace />
         <Tour />
         <IdleOrbit />
         <ReadySignal />

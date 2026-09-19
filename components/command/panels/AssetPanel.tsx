@@ -1,9 +1,11 @@
 "use client";
 
-import { Wrench, Zap, Activity } from "lucide-react";
+import { Wrench, Zap, Activity, Radar } from "lucide-react";
 import { useSim } from "@/store/sim";
+import { useTrace } from "@/store/trace";
 import { getModel } from "@/lib/architecture/model";
 import { assessAsset } from "@/lib/intelligence/maintenance";
+import { sampleServedRoom } from "@/lib/twin/trace";
 import { scheduleService, pushFeed, fmtClock } from "@/lib/sim/engine";
 import { triggerFailure } from "@/lib/sim/actions";
 import { Button, Meter, Provenance, Section, Sparkline, Stat, Tag } from "@/components/ui/primitives";
@@ -58,6 +60,19 @@ export function AssetPanel({ id }: { id: string }) {
           <span className="text-[10.5px] text-low">Weibull hazard (k, λ by asset class) × telemetry anomaly</span>
           <Provenance kind="modeled" />
         </div>
+        {risk > 0.25 && occ > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-3 border-critical/50 text-critical hover:bg-critical/10"
+            onClick={() => {
+              const room = sampleServedRoom(model, state, id);
+              if (room) useTrace.getState().start(room, id);
+            }}
+          >
+            <Radar size={12} /> Trace to affected guest
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-3">

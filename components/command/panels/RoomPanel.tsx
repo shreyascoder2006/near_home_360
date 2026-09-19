@@ -1,11 +1,13 @@
 "use client";
 
-import { Waves, Star, Thermometer, Sparkles } from "lucide-react";
+import { Waves, Star, Thermometer, Sparkles, Radar } from "lucide-react";
 import { useSim } from "@/store/sim";
 import { useTwin } from "@/store/twin";
+import { useTrace } from "@/store/trace";
 import { getModel } from "@/lib/architecture/model";
 import { statusColors, statusLabels } from "@/lib/twin/colors";
 import { nextBestActions } from "@/lib/intelligence/personalization";
+import { worstAssetForRoom } from "@/lib/twin/trace";
 import { setRoomConditioning } from "@/lib/sim/actions";
 import { createRequest, dispatchStaff, pushFeed, fmtClock } from "@/lib/sim/engine";
 import { Button, Meter, Provenance, Section, Stat, Tag } from "@/components/ui/primitives";
@@ -51,6 +53,20 @@ export function RoomPanel({ id }: { id: string }) {
         <Stat label="7d revenue" value={fmtINR(rs.revenue7d)} sub={`${rs.nights7d} nights`} />
         <Stat label="Maint. risk" value={`${(rs.maintRisk * 100).toFixed(0)}%`} accent={rs.maintRisk > 0.5 ? "var(--critical)" : rs.maintRisk > 0.3 ? "var(--warm)" : undefined} sub={worst ? worst.a.name : "—"} />
       </div>
+
+      {(rs.maintRisk > 0.25 || (g && g.sentiment < -0.15)) && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="self-start border-critical/50 text-critical hover:bg-critical/10"
+          onClick={() => {
+            const w = worstAssetForRoom(model, state, id);
+            if (w) useTrace.getState().start(id, w.id);
+          }}
+        >
+          <Radar size={12} /> Investigate root cause
+        </Button>
+      )}
 
       {g ? (
         <Section title="In-house guest" right={<Provenance />}>
