@@ -8,6 +8,7 @@ import { useQuality, type QualityTier } from "@/store/quality";
 import { fmtClock } from "@/lib/sim/engine";
 import type { Scenario } from "@/lib/sim/types";
 import { Button, Kbd, Provenance } from "@/components/ui/primitives";
+import { DashboardMenu } from "./DashboardMenu";
 import { cn, fmtINR, fmtPct } from "@/lib/utils";
 
 const scenarios: { id: Scenario; label: string }[] = [
@@ -52,6 +53,10 @@ export function TopBar() {
           <span className="label mt-0.5 text-[9px]">Azure Bay Resort · seed 0x{state.seed.toString(16)}</span>
         </div>
       </Link>
+
+      <div className="mx-2 h-6 w-px bg-stroke" />
+
+      <DashboardMenu />
 
       <div className="mx-2 h-6 w-px bg-stroke" />
 
